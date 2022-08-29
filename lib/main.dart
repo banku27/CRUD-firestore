@@ -1,9 +1,7 @@
-import 'dart:ffi';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:crud_firestore/firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_storage/firebase_storage.dart';
+
 import 'package:flutter/material.dart';
 
 void main() async {
@@ -31,15 +29,66 @@ class HomePage extends StatefulWidget {
   const HomePage({Key? key}) : super(key: key);
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  _HomePageState createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
-  final CollectionReference products =
-      FirebaseFirestore.instance.collection('products');
-
+// text fields' controllers
   final TextEditingController nameController = TextEditingController();
   final TextEditingController priceController = TextEditingController();
+
+  final CollectionReference _products =
+      FirebaseFirestore.instance.collection('products');
+
+  Future<void> create([DocumentSnapshot? documentSnapshot]) async {
+    await showModalBottomSheet(
+        isScrollControlled: true,
+        context: context,
+        builder: (BuildContext ctx) {
+          return Padding(
+            padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
+                ),
+                TextField(
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  controller: priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Price',
+                  ),
+                ),
+                const SizedBox(
+                  height: 20,
+                ),
+                ElevatedButton(
+                  child: const Text('Create'),
+                  onPressed: () async {
+                    final String name = nameController.text;
+                    final double? price = double.tryParse(priceController.text);
+                    if (price != null) {
+                      await _products.add({"name": name, "price": price});
+
+                      nameController.text = '';
+                      priceController.text = '';
+                      Navigator.of(context).pop();
+                    }
+                  },
+                )
+              ],
+            ),
+          );
+        });
+  }
 
   Future<void> update([DocumentSnapshot? documentSnapshot]) async {
     if (documentSnapshot != null) {
@@ -48,110 +97,111 @@ class _HomePageState extends State<HomePage> {
     }
 
     await showModalBottomSheet(
-      context: context,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: 20,
-            left: 20,
-            bottom: 230,
-            right: 20,
-            // bottom: MediaQuery.of(context).viewInsets.bottom + 140,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Name',
+        isScrollControlled: true,
+        context: context,
+        builder: (BuildContext ctx) {
+          return Padding(
+            padding: EdgeInsets.only(
+                top: 20,
+                left: 20,
+                right: 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Name'),
                 ),
-              ),
-              TextField(
-                keyboardType:
-                    const TextInputType.numberWithOptions(decimal: true),
-                controller: priceController,
-                decoration: const InputDecoration(
-                  labelText: 'Price',
+                TextField(
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  controller: priceController,
+                  decoration: const InputDecoration(
+                    labelText: 'Price',
+                  ),
                 ),
-              ),
-              const SizedBox(
-                height: 20,
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final String name = nameController.text;
-                  final double? price = double.tryParse(priceController.text);
-                  if (price != null) {
-                    await products.doc(documentSnapshot!.id).update(
-                      {'name': name, 'price': price},
-                    );
-                    nameController.text = '';
-                    priceController.text = '';
-                  }
-                },
-                child: const Text('Update'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+                const SizedBox(
+                  height: 20,
+                ),
+                ElevatedButton(
+                  child: const Text('Update'),
+                  onPressed: () async {
+                    final String name = nameController.text;
+                    final double? price = double.tryParse(priceController.text);
+                    if (price != null) {
+                      await _products
+                          .doc(documentSnapshot!.id)
+                          .update({"name": name, "price": price});
+                      nameController.text = '';
+                      priceController.text = '';
+                      Navigator.of(context).pop();
+                    }
+                  },
+                )
+              ],
+            ),
+          );
+        });
   }
 
-  @override
-  void dispose() {
-    nameController.dispose();
-    priceController.dispose();
-    super.dispose();
+  Future<void> _delete(String productId) async {
+    await _products.doc(productId).delete();
+
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('You have successfully deleted a product')));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: StreamBuilder(
-        stream: products.snapshots(),
-        builder: (context, AsyncSnapshot<QuerySnapshot> streamSnapshot) {
-          if (streamSnapshot.hasData) {
-            return ListView.builder(
-              itemCount: streamSnapshot.data!.docs.length,
-              itemBuilder: (context, index) {
-                final DocumentSnapshot documentSnapshot =
-                    streamSnapshot.data!.docs[index];
-                return Card(
-                  margin: const EdgeInsets.all(10),
-                  child: ListTile(
-                    title: Text(
-                      documentSnapshot['name'],
-                    ),
-                    subtitle: Text(
-                      documentSnapshot['price'].toString(),
-                    ),
-                    trailing: SizedBox(
-                      width: 100,
-                      child: Row(
-                        children: [
-                          IconButton(
-                            onPressed: () {
-                              update(documentSnapshot);
-                            },
-                            icon: const Icon(Icons.edit),
-                          ),
-                        ],
+        appBar: AppBar(
+          title: const Center(child: Text('Firebase Firestore')),
+        ),
+        body: StreamBuilder(
+          stream: _products.snapshots(),
+          builder: (context, AsyncSnapshot<QuerySnapshot> streamSnapshot) {
+            if (streamSnapshot.hasData) {
+              return ListView.builder(
+                itemCount: streamSnapshot.data!.docs.length,
+                itemBuilder: (context, index) {
+                  final DocumentSnapshot documentSnapshot =
+                      streamSnapshot.data!.docs[index];
+                  return Card(
+                    margin: const EdgeInsets.all(10),
+                    child: ListTile(
+                      title: Text(documentSnapshot['name']),
+                      subtitle: Text(documentSnapshot['price'].toString()),
+                      trailing: SizedBox(
+                        width: 100,
+                        child: Row(
+                          children: [
+                            IconButton(
+                                icon: const Icon(Icons.edit),
+                                onPressed: () => update(documentSnapshot)),
+                            IconButton(
+                                icon: const Icon(Icons.delete),
+                                onPressed: () => _delete(documentSnapshot.id)),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            );
-          } else {
+                  );
+                },
+              );
+            }
+
             return const Center(
               child: CircularProgressIndicator(),
             );
-          }
-        },
-      ),
-    );
+          },
+        ),
+// Add new product
+        floatingActionButton: FloatingActionButton(
+          onPressed: () => create(),
+          child: const Icon(Icons.add),
+        ),
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat);
   }
 }
